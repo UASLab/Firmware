@@ -114,9 +114,9 @@ bool update(uint64_t time_usec, struct sensor_combined_s *sensorCombined_ptr, st
 	/* Push results into nav struct */
     uout_ptr->timestamp = time_usec; 
 
-    uout_ptr->yaw_body = 1.0;
-    uout_ptr->roll_body = -1.0;
-    uout_ptr->pitch_body = 0.5;
+    uout_ptr->yaw_rad = 1.0;
+    uout_ptr->roll_rad = -1.0;
+    uout_ptr->pitch_rad = 0.5;
 
 	// If valid update, return `true`.  Otherwise return `false`.
 	return true;
