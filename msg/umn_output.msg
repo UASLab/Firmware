@@ -1,5 +1,4 @@
 # Time and Status
-uint64 timestamp_received   # timestamp when the estimate was received
 bool dead_reckoning     # True if this position is estimated through dead-reckoning
 
 # Attitude

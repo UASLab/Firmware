@@ -55,15 +55,26 @@
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
 
-// Subscrite to uORB topics
+#include <drivers/drv_hrt.h>
+
+
+// Include headers for uORB topics
 #include <uORB/uORB.h>
-#include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/rc_channels.h>
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/airspeed.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/control_state.h>
+#include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/estimator_status.h>
+#include <uORB/topics/actuator_armed.h>
+#include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/umn_output.h>
 
 // Custom data
-#include "data_structures.h"
 #include "umn_algorithm.h"
 
 static bool thread_should_exit = false;		/**< daemon exit flag */
@@ -161,25 +172,17 @@ int umn_sensors_thread_main(int argc, char *argv[])
 	thread_running = true;
 
 
-    /* Declare structures to be used for shuttling data */
-    struct imu imu_s;
-    struct airdata airdata_s;
-    struct gps gps_s;
-    struct sensordata sensordata_s;
-    sensordata_s.imuData_ptr = &imu_s;
-    sensordata_s.gpsData_ptr = &gps_s;
-    sensordata_s.adData_ptr = &airdata_s;
-    struct nav nav_s;
-    struct control control_s;
 
     /* subscribe to topics */
-    // Sensors Combined
-    int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
-    orb_set_interval(sensor_sub_fd, 100);
+    int sensor_sub = orb_subscribe(ORB_ID(sensor_combined));
+    orb_set_interval(sensor_sub, 10); // Without this, this will run at ~250 Hz.
+    int gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
+    int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
+    int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 
     // RC Channels
-    int rc_channels_fd = orb_subscribe(ORB_ID(rc_channels));
-    orb_set_interval(rc_channels_fd, 100);
+    int rc_channels_sub = orb_subscribe(ORB_ID(rc_channels));
+    orb_set_interval(rc_channels_sub, 100);
 
     // UMN Attitude
     /* publish topics */
@@ -188,15 +191,28 @@ int umn_sensors_thread_main(int argc, char *argv[])
 
     /* one could wait for multiple topics with this technique */
     px4_pollfd_struct_t fds[2] = {};
-    fds[0].fd = sensor_sub_fd;
+    fds[0].fd = sensor_sub;
     fds[0].events = POLLIN;
-    fds[1].fd = rc_channels_fd;
+    fds[1].fd = rc_channels_sub;
     fds[1].events = POLLIN;
+
+    // initialize data structures outside of loop
+    // because they will else not always be
+    // properly populated
+    sensor_combined_s sensors = {};
+    vehicle_gps_position_s gps = {};
+    airspeed_s airspeed = {};
+    vehicle_land_detected_s vehicle_land_detected = {};
+    //vehicle_status_s vehicle_status = {};
+    rc_channels_s rc_struct = {};
+
+    umn_output_s uout = {};
+
 
 	while (!thread_should_exit) {
 
-        /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
-        int poll_ret = px4_poll(fds, 1, 1000);
+        /* wait for sensor update of file descriptors for 1000 ms (1 second) */
+        int poll_ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
 
         /* handle the poll result */
 		if (poll_ret < 0) {
@@ -211,81 +227,77 @@ int umn_sensors_thread_main(int argc, char *argv[])
 			continue;
 		}
 
+        if (fds[1].revents & POLLIN) {
+            orb_copy(ORB_ID(rc_channels), rc_channels_sub, &rc_struct);
+            // TODO: handle how to utilize RC channels
+            // /* When using actual hardware, check RC Switch to decide on execution. */
+            // #if defined __PX4_NUTTX
+            // // Only proceed further if scaled channel output > 0
+            // if (!orb_copy(ORB_ID(rc_channels), rc_channels_sub, &rc_struct)){
+            //     //PX4_INFO("RC channel[RC_CHANNEL_SWITCH]: %8.4f", (double)rc_struct.channels[RC_CHANNEL_SWITCH]);
+            //     if(rc_struct.channels[RC_CHANNEL_SWITCH] < 0){
+            //         continue;
+            //     }
+            // } else {
+            //     continue;
+            // }
+            // #endif
 
-        /* When using actual hardware, check RC Switch to decide on execution. */
-        #if defined __PX4_NUTTX
-        struct rc_channels_s rc_struct;
-        // Only proceed further if scaled channel output > 0
-        if (!orb_copy(ORB_ID(rc_channels), rc_channels_fd, &rc_struct)){
-            //PX4_INFO("RC channel[RC_CHANNEL_SWITCH]: %8.4f", (double)rc_struct.channels[RC_CHANNEL_SWITCH]);
-            if(rc_struct.channels[RC_CHANNEL_SWITCH] < 0){
-                continue;
-            }
-        } else {
+            // fetch sensor data in next loop
+            continue;
+
+        } else if (!(fds[0].revents & POLLIN)) {
+            // no new data
             continue;
         }
-        #endif
 
-		/* update sensor readings */
-		struct sensor_combined_s sensors;
+
+        bool gps_updated = false;
+        bool airspeed_updated = false;
+        bool vehicle_land_detected_updated = false;
+
+        orb_copy(ORB_ID(sensor_combined), sensor_sub, &sensors);
         
+        /* update all other topics if they have new data */
+        orb_check(gps_sub, &gps_updated);
+        if (gps_updated) {
+            orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps);
+        }
 
-		if (!orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &sensors)) {
+        orb_check(airspeed_sub, &airspeed_updated);
+        if (airspeed_updated) {
+            orb_copy(ORB_ID(airspeed), airspeed_sub, &airspeed);
+        }
 
-            imu_s.ax = sensors.accelerometer_m_s2[0];
-            imu_s.ay = sensors.accelerometer_m_s2[1];
-            imu_s.az = sensors.accelerometer_m_s2[2];
+        orb_check(vehicle_land_detected_sub, &vehicle_land_detected_updated);
+        if (gps_updated) {
+            orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
+        }
 
-            imu_s.wx = sensors.gyro_rad[0];
-            imu_s.wy = sensors.gyro_rad[1];
-            imu_s.wz = sensors.gyro_rad[2];
+        hrt_abstime now = 0;
+        now = hrt_absolute_time();
+ 
 
-            imu_s.hx = sensors.magnetometer_ga[0];
-            imu_s.hy = sensors.magnetometer_ga[1];
-            imu_s.hz = sensors.magnetometer_ga[2];
+        // PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
+        //          (double)sensors.accelerometer_m_s2[0],
+        //          (double)sensors.accelerometer_m_s2[1],
+        //          (double)sensors.accelerometer_m_s2[2]);
 
-            airdata_s.h = sensors.baro_alt_meter;
-            // TODO: airdata_s.ias = <airspeed.msg>
-            // TODO: GPS
-            // TODO: actuators
+        // PX4_INFO("Gyro:\t%8.4f\t%8.4f\t%8.4f",
+        //          (double)sensors.gyro_rad[0],
+        //          (double)sensors.gyro_rad[1],
+        //          (double)sensors.gyro_rad[2]);
 
+        // PX4_INFO("Mag:\t%8.4f\t%8.4f\t%8.4f",
+        //          (double)sensors.magnetometer_ga[0],
+        //          (double)sensors.magnetometer_ga[1],
+        //          (double)sensors.magnetometer_ga[2]);
 
-
-            // PX4_INFO("Gyro:\t%8.4f\t%8.4f\t%8.4f",
-            //          (double)imu_s.wx,
-            //          (double)imu_s.wy,
-            //          (double)imu_s.wz);
-            
-            // PX4_INFO("Airdata :\t%8.4f",
-            //          (double)airdata_s.h);         
-
-            // PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
-            //          (double)sensors.accelerometer_m_s2[0],
-            //          (double)sensors.accelerometer_m_s2[1],
-            //          (double)sensors.accelerometer_m_s2[2]);
-
-            // PX4_INFO("Gyro:\t%8.4f\t%8.4f\t%8.4f",
-            //          (double)sensors.gyro_rad[0],
-            //          (double)sensors.gyro_rad[1],
-            //          (double)sensors.gyro_rad[2]);
-
-            // PX4_INFO("Mag:\t%8.4f\t%8.4f\t%8.4f",
-            //          (double)sensors.magnetometer_ga[0],
-            //          (double)sensors.magnetometer_ga[1],
-            //          (double)sensors.magnetometer_ga[2]);
-
-		}
+		
 
         /* Call algorithm and update output*/
-        if (update(&sensordata_s, &nav_s, &control_s)) {
-            /* publish attitude */
-            struct umn_output_s uout = {};
-            uout.timestamp = sensors.timestamp; // TODO: Decide if this works even if sensors not updated
-
-            uout.yaw_body = nav_s.psi;
-            uout.roll_body = nav_s.phi;
-            uout.pitch_body = nav_s.the;
-
+        if (update(now, &sensors, &airspeed, &gps, &vehicle_land_detected, &uout)) {
+            /* publish U of MN Output */
             int uout_inst;
             orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
         }

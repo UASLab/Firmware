@@ -44,14 +44,30 @@
 
 #include <mathlib/mathlib.h> // Math and matrix library.
 
-#include "data_structures.h" // Must come before `umn_algorithm.h`
+// Include headers for uORB topics
+#include <uORB/uORB.h>
+#include <uORB/topics/rc_channels.h>
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/airspeed.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/control_state.h>
+#include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/estimator_status.h>
+#include <uORB/topics/actuator_armed.h>
+#include <uORB/topics/vehicle_land_detected.h>
+#include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/umn_output.h>
+
 #include "umn_algorithm.h"
 
 
 using math::Matrix;
 using math::Vector;
 
-bool update(struct sensordata *sensorData_ptr, struct nav *navData_ptr, struct control *controlData_ptr){
+bool update(uint64_t time_usec, struct sensor_combined_s *sensorCombined_ptr, struct airspeed_s *airSpeed_ptr, struct vehicle_gps_position_s *gps_ptr, struct vehicle_land_detected_s *landDetected_ptr, struct umn_output_s *uout_ptr){
 	
 	/* BEGIN YOUR ALGORITHM HERE
 	 *   Step 1. Pull data from inputs
@@ -63,11 +79,11 @@ bool update(struct sensordata *sensorData_ptr, struct nav *navData_ptr, struct c
 	 */
 
 	/* Access sensor data from `sensorData_ptr`. */
-	// Example  AccelX:   sensorData_ptr->imuData_ptr->ax
-	// Example    MagX:   sensorData_ptr->imuData_ptr->hx
-	// Example GPS Lat:  sensorData_ptr->gpsData_ptr->lat
-	// Example Baro-Alt: sensorData_ptr->adData_ptr->h
-	float ax = sensorData_ptr->imuData_ptr->ax; // Accessing accelerometer data.
+	// Example  AccelX:   sensorCombined_ptr->accelerometer_m_s2[0]
+	// Example    MagX:   sensorCombined_ptr->magnetometer_ga[0]
+	// Example GPS Lat:  gps_ptr->lat  // Latitude in 1E-7 degrees
+	// Example Baro-Alt: airSpeed_ptr->baro_alt_meter
+	float ax = sensorCombined_ptr->accelerometer_m_s2[0]; // Accessing accelerometer data.
 
 
 	/* Example Matrix Math */
@@ -92,13 +108,16 @@ bool update(struct sensordata *sensorData_ptr, struct nav *navData_ptr, struct c
 	// (a*c); // Build-time error for incorrect vector-math.
 
 	/* Example print message */
-	PX4_INFO("Printed using `PX4_INFO`.  AccelX: %.3f", (double)ax);
+	PX4_INFO("Printed using `PX4_INFO`. (%10d usec) AccelX: %.3f", time_usec, (double)ax);
 	//printf("Printed using `printf`.  AccelX: %.3f \n", (double)ax);
 
 	/* Push results into nav struct */
-	navData_ptr->phi = 1;
-	navData_ptr->the = -1;
-	navData_ptr->psi = 0.25;
+    uout_ptr->timestamp = time_usec; 
+
+    uout_ptr->yaw_body = 1.0;
+    uout_ptr->roll_body = -1.0;
+    uout_ptr->pitch_body = 0.5;
+
 	// If valid update, return `true`.  Otherwise return `false`.
 	return true;
 }
