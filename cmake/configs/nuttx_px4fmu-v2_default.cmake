@@ -113,8 +113,8 @@ set(config_module_list
 	#
 	# Logging
 	#
-	#modules/logger
-	modules/sdlog2
+	modules/logger
+	#modules/sdlog2
 
 	#
 	# Library modules
@@ -156,6 +156,11 @@ set(config_module_list
 	# Rover apps
 	#
 	#examples/rover_steering_control
+
+	#
+	# UMN apps
+	#
+	modules/umn_app
 
 	#
 	# Demo apps

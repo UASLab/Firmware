@@ -57,6 +57,11 @@ set(config_module_list
 	modules/uORB
 	modules/vtol_att_control
 
+	#
+	# UMN Modules
+	#
+	modules/umn_app
+
 	lib/controllib
 	lib/conversion
 	lib/DriverFramework/framework
