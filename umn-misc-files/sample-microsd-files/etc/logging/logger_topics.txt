@@ -1,0 +1,10 @@
+sensor_combined, 10
+rc_channels, 100
+vehicle_gps_position, 100
+airspeed, 10
+vehicle_land_detected, 100
+vehicle_attitude, 100
+vehicle_local_position, 100
+vehicle_global_position, 100
+umn_output, 10
+

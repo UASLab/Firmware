@@ -1,0 +1,8 @@
+# Custom Parameters, as described here: 
+# http://dev.px4.io/advanced-system-startup.html#customizing-the-system-startup
+
+# Use `logger` and begin logging at power on (i.e. don't wait for arming)
+#
+param set SYS_LOGGER 1
+param set SDLOG_MODE 1
+
