@@ -72,7 +72,7 @@ bool update(uint64_t time_usec, struct sensor_combined_s *sensorCombined_ptr, st
 	/* BEGIN YOUR ALGORITHM HERE
 	 *   Step 1. Pull data from inputs
 	 *   Step 2. Do your algorithm kung fu
-	 *   Step 3. Pack output into `navData_ptr`
+	 *   Step 3. Pack output into `uout_ptr`  (elements described here: ~/src/Firmware/msg/umn_output.msg)
 	 *	 Rinse and repeat...
 	 *  
 	 *   Some example code is provided below.  Feel free to remove.
@@ -82,7 +82,8 @@ bool update(uint64_t time_usec, struct sensor_combined_s *sensorCombined_ptr, st
 	// Example  AccelX:   sensorCombined_ptr->accelerometer_m_s2[0]
 	// Example    MagX:   sensorCombined_ptr->magnetometer_ga[0]
 	// Example GPS Lat:  gps_ptr->lat  // Latitude in 1E-7 degrees
-	// Example Baro-Alt: airSpeed_ptr->baro_alt_meter
+	// Example Baro-Alt: sensorCombined_ptr->baro_alt_meter
+	// Example Indicated Airspeed:  airSpeed_ptr->indicated_airspeed_m_s
 	float ax = sensorCombined_ptr->accelerometer_m_s2[0]; // Accessing accelerometer data.
 
 
