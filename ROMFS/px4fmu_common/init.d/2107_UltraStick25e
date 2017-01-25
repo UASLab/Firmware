@@ -1,0 +1,102 @@
+#!nsh
+#
+# @name UltraStick25e (U of MN)
+#
+# @type Standard Plane
+#
+# @output MAIN1 left aileron
+# @output MAIN2 right aileron
+# @output MAIN3 elevator
+# @output MAIN4 throttle
+# @output MAIN5 rudder
+# @output MAIN6 left flap
+# @output MAIN7 right flap
+#
+# @output AUX1 feed-through of RC AUX1 channel
+# @output AUX2 feed-through of RC AUX2 channel
+# @output AUX3 feed-through of RC AUX3 channel
+#
+# @maintainer Chris Regan <rega0051@umn.edu>
+#
+
+sh /etc/init.d/rc.fw_defaults
+
+if [ $AUTOCNF == yes ]
+then
+	# Logger
+	param set SYS_LOGGER 1
+
+	# Battery Setup
+	param set BAT_N_CELLS 3
+	param set BAT_CAPACITY 3300
+	param set BAT_V_CHARGED 4.20
+	param set BAT_V_EMPTY 3.70
+
+	# Airspeeds
+	param set FW_AIRSPD_MAX 20
+	param set FW_AIRSPD_MIN 10
+	param set FW_AIRSPD_TRIM 15
+
+	# Thrust Control
+	
+
+	# Roll Control
+	param set FW_R_TC 0.4
+	param set FW_R_LIM 50.0
+	param set FW_R_RMAX 70.0 # Max roll rate, dps
+
+	param set FW_RR_FF 0.5
+	param set FW_RR_P 0.05
+	param set FW_RR_I 0.01
+	param set FW_RR_IMAX 0.2
+
+	# Pitch Control
+	param set FW_P_TC 0.4
+	param set FW_P_LIM_MIN -20
+	param set FW_P_LIM_MAX 20
+	param set FW_P_RMAX_NEG -20
+	param set FW_P_RMAX_POS 20
+
+	param set FW_PR_FF 0.5
+	param set FW_PR_P 0.08
+	param set FW_PR_I 0.02
+	param set FW_PR_IMAX 0.4
+
+
+	# Yaw Control
+	param set FW_YCO_METHOD 1
+	param set FW_YCO_VMIN 7
+
+	param set FW_Y_RMAX 0.0
+
+	param set FW_YR_FF 0.30
+	param set FW_YR_P 0.05
+	param set FW_YR_I 0.0
+	param set FW_YR_IMAX 0.2
+
+
+	# L1 Controller Paramters
+	param set FW_L1_DAMPING 0.74
+	param set FW_L1_PERIOD 20
+
+	# Landing Parameters
+	param set FW_LND_ANG 3.0
+	param set FW_LND_FLALT 5.0
+	param set FW_LND_HHDIST 15.0
+	param set FW_LND_HVIRT 10.0
+	param set FW_LND_TLALT -1.0
+	param set FW_THR_LND_MAX 1.0
+	param set FW_LND_AIRSPD_SC 130
+
+	# Provide ESC a constant 900 us pulse
+	set PWM_OUT 4
+	set PWM_DISARMED 900
+
+fi
+
+# Configure this as plane
+set MAV_TYPE 1
+
+# Set mixer
+set MIXER aaetrff
+
