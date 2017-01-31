@@ -73,6 +73,11 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/umn_output.h>
+// [Hamid] Debug topic can be added.  
+//         Reference: https://dev.px4.io/advanced-debug-values.html
+//         Tested successfully 2017-01-31, but commented out.
+//#include <uORB/topics/debug_key_value.h>
+
 
 // Custom data
 #include "umn_algorithm.h"
@@ -188,6 +193,16 @@ int umn_sensors_thread_main(int argc, char *argv[])
     /* publish topics */
     orb_advert_t    _uout_pub = NULL;
 
+    // /* advertise debug value */
+    // struct debug_key_value_s dbg = {};
+    // //dbg.key = "velx"; // Leads to error in C++
+    // dbg.key[0] = 118; // v
+    // dbg.key[1] = 101; // e
+    // dbg.key[2] = 108; // l
+    // dbg.key[3] = 120; // x
+    // dbg.key[4] = '\0';// null
+    // dbg.value = 0.0f;
+    // orb_advert_t pub_dbg = orb_advertise(ORB_ID(debug_key_value), &dbg);
 
     /* one could wait for multiple topics with this technique */
     px4_pollfd_struct_t fds[2] = {};
@@ -300,6 +315,10 @@ int umn_sensors_thread_main(int argc, char *argv[])
             /* publish U of MN Output */
             int uout_inst;
             orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
+
+            // /* Publish debug value */
+            // dbg.value = 3.14;
+            // orb_publish(ORB_ID(debug_key_value), pub_dbg, &dbg);
         }
 
 
