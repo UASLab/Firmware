@@ -143,7 +143,7 @@ int umn_app_main(int argc, char *argv[])
 		daemon_task = px4_task_spawn_cmd("daemon",
 						 SCHED_DEFAULT,
 						 SCHED_PRIORITY_DEFAULT,
-						 2000,
+						 5800,
 						 umn_sensors_thread_main,
 						 (argv) ? (char *const *)&argv[2] : (char *const *)NULL);
 		return 0;

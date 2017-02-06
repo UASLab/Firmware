@@ -33,7 +33,8 @@
 px4_add_module(
 	MODULE modules__umn_app
 	MAIN umn_app
-	STACK_MAIN 1200
+	STACK_MAIN 2500
+	STACK_MAX 4000
 	SRCS
 		umn_app.cpp
         umn_algorithm.cpp
