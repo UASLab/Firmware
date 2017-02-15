@@ -54,6 +54,7 @@
 
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
+#include <systemlib/param/param.h>
 
 #include <drivers/drv_hrt.h>
 
@@ -73,6 +74,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/umn_output.h>
+#include <uORB/topics/parameter_update.h>
 // [Hamid] Debug topic can be added.  
 //         Reference: https://dev.px4.io/advanced-debug-values.html
 //         Tested successfully 2017-01-31, but commented out.
@@ -185,13 +187,20 @@ int umn_sensors_thread_main(int argc, char *argv[])
     int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
     int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 
+    /* subscribe to topics which will be published to selectively so that we can
+       copy over the latest version of the message */
+    int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
+    int _att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+
     // RC Channels
     int rc_channels_sub = orb_subscribe(ORB_ID(rc_channels));
     orb_set_interval(rc_channels_sub, 100);
 
-    // UMN Attitude
     /* publish topics */
+    // UMN Attitude
     orb_advert_t    _uout_pub = NULL;
+    orb_advert_t    _ctrl_state_pub = nullptr;
+    orb_advert_t    _att_pub = nullptr;
 
     // /* advertise debug value */
     // struct debug_key_value_s dbg = {};
@@ -220,8 +229,15 @@ int umn_sensors_thread_main(int argc, char *argv[])
     vehicle_land_detected_s vehicle_land_detected = {};
     //vehicle_status_s vehicle_status = {};
     rc_channels_s rc_struct = {};
+    control_state_s ctrl_state = {};
+    vehicle_attitude_s att = {};
 
     umn_output_s uout = {};
+
+    // Local parameter value
+    param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
+    bool umn_control_b = false;
+    // int param_res = PX4_OK;
 
 
 	while (!thread_should_exit) {
@@ -289,6 +305,12 @@ int umn_sensors_thread_main(int argc, char *argv[])
             orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
         }
 
+        // Always copy over latest `control_state` and `vehicle_attitude` message
+        // regardless of if changed or not.  This is because we will be selectively
+        // updating it's parameters.
+        orb_copy(ORB_ID(control_state), _ctrl_state_sub, &ctrl_state);
+        orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
+
         hrt_abstime now = 0;
         now = hrt_absolute_time();
  
@@ -308,13 +330,55 @@ int umn_sensors_thread_main(int argc, char *argv[])
         //          (double)sensors.magnetometer_ga[1],
         //          (double)sensors.magnetometer_ga[2]);
 
-		
 
+
+        /* generate control state data */
+        // note: of all the messages, we will only update the quaternions
+       
         /* Call algorithm and update output*/
         if (update(now, &sensors, &airspeed, &gps, &vehicle_land_detected, &uout)) {
             /* publish U of MN Output */
             int uout_inst;
             orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
+
+            // Optional: force `EKF2_UMN_CONTROL = 1`.  It may make sense to set
+            //           this using QGC or via RC.
+            /* Set parameter for enabling attitude control */
+            // bool temp_true=1;
+            // param_res = param_set_no_autosave(param_umn_control, &temp_true);
+            // if (param_res != PX4_OK) {
+            //     PX4_ERR("unable to set %s", "EKF2_UMN_CONTROL");
+            // }
+
+            /* Decide whether t publish modified `veicle_attitude` and 
+               `control_state` messages */
+            param_get(param_umn_control, &umn_control_b);
+            // PX4_INFO("EKF2_UMN_CONTROL:\t%d \n",
+            //      (int)umn_control_b);
+            if (umn_control_b) {
+                /* publish control state */
+                ctrl_state.q[0] = uout.q[0];
+                ctrl_state.q[1] = uout.q[1];
+                ctrl_state.q[2] = uout.q[2];
+                ctrl_state.q[3] = uout.q[3];
+                if (_ctrl_state_pub == nullptr) {
+                    _ctrl_state_pub = orb_advertise(ORB_ID(control_state), &ctrl_state);
+                } else {
+                    orb_publish(ORB_ID(control_state), _ctrl_state_pub, &ctrl_state);
+                }
+
+                /* publish vehicle attitude */
+                att.q[0] = uout.q[0];
+                att.q[1] = uout.q[1];
+                att.q[2] = uout.q[2];
+                att.q[3] = uout.q[3];
+                if (_att_pub == nullptr) {
+                    _att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
+
+                } else {
+                    orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
+                }
+            }
 
             // /* Publish debug value */
             // dbg.value = 3.14;
@@ -326,6 +390,9 @@ int umn_sensors_thread_main(int argc, char *argv[])
 	} // while loop
 
 	warnx("[daemon] exiting.\n");
+
+    /* Reset default parameter values */
+    param_reset(param_umn_control);
 
 	thread_running = false;
 

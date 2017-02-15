@@ -412,6 +412,13 @@ void Ekf2::task_main()
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
+    /* [UMN APP] Place holder to store parameters */
+    param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
+    /* subscribe to topics which will be published to selectively so that we can
+       copy over the latest version of the message */
+    int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
+    int _att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+
 	px4_pollfd_struct_t fds[2] = {};
 	fds[0].fd = sensors_sub;
 	fds[0].events = POLLIN;
@@ -700,9 +707,18 @@ void Ekf2::task_main()
 
 			float gyro_rad[3];
 
+            /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
+	        bool umn_control_b;
+	        param_get(param_umn_control, &umn_control_b);
+
 			{
 				// generate control state data
 				control_state_s ctrl_state = {};
+	            /* [UMN APP] Copy over latest message so
+	            as to avoid overwriting non-set values.This is because we may
+	            be selectively updating values. */
+	            orb_copy(ORB_ID(control_state), _ctrl_state_sub, &ctrl_state);
+
 				float gyro_bias[3] = {};
 				_ekf.get_gyro_bias(gyro_bias);
 				ctrl_state.timestamp = hrt_absolute_time();
@@ -730,10 +746,14 @@ void Ekf2::task_main()
 				ctrl_state.z_pos = position[2];
 
 				// Attitude quaternion
-				ctrl_state.q[0] = q(0);
-				ctrl_state.q[1] = q(1);
-				ctrl_state.q[2] = q(2);
-				ctrl_state.q[3] = q(3);
+	            /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
+				/* attitude quaternions for control state */
+    	        if (!umn_control_b){
+					ctrl_state.q[0] = q(0);
+					ctrl_state.q[1] = q(1);
+					ctrl_state.q[2] = q(2);
+					ctrl_state.q[3] = q(3);
+	            }
 
 				_ekf.get_quat_reset(&ctrl_state.delta_q_reset[0], &ctrl_state.quat_reset_counter);
 
@@ -785,14 +805,24 @@ void Ekf2::task_main()
 
 
 			{
-				// generate vehicle attitude quaternion data
-				struct vehicle_attitude_s att = {};
+		        // generate vehicle attitude quaternion data
+		        struct vehicle_attitude_s att = {};
+
+		        /* [UMN APP] Copy over latest message so
+           		as to avoid overwriting non-set values.This is because we may
+           		be selectively updating values. */
+        		orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
+				
+				
 				att.timestamp = hrt_absolute_time();
 
-				att.q[0] = q(0);
-				att.q[1] = q(1);
-				att.q[2] = q(2);
-				att.q[3] = q(3);
+		        /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
+		        if (!umn_control_b){
+					att.q[0] = q(0);
+					att.q[1] = q(1);
+					att.q[2] = q(2);
+					att.q[3] = q(3);
+				}
 
 				att.rollspeed = gyro_rad[0];
 				att.pitchspeed = gyro_rad[1];

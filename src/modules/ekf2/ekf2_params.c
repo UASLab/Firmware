@@ -39,6 +39,20 @@
  *
  */
 
+/**
+ * Enable attitude control of UMN App
+ *
+ * A value of 1 indicates that the ekf2 module will NOT publish 
+ * quaternion values.  It expects the `umn_app` to be running and
+ * publishing the quaternion estimates.  Default is 0.
+ *
+ * @group EKF2
+ * @boolean
+ * @min 0
+ * @max 1
+ */
+PARAM_DEFINE_INT32(EKF2_UMN_CONTROL, 0);
+
 
 /**
  * Minimum time of arrival delta between non-IMU observations before data is downsampled.
