@@ -56,8 +56,12 @@ sensors start
 commander start
 land_detector start multicopter
 navigator start
-attitude_estimator_q start
-local_position_estimator start
+#attitude_estimator_q start
+#local_position_estimator start
+#    Set multi-copter to use EKF2 estimator
+#    Reference: https://dev.px4.io/advanced-switching_state_estimators.html
+param set SYS_MC_EST_GROUP 2
+ekf2 start
 mc_pos_control start
 mc_att_control start
 mixer load /dev/pwm_output0 ROMFS/px4fmu_common/mixers/quad_w.main.mix
