@@ -48,3 +48,7 @@ float32[25] data_array
 # Sensor Errors
 float32[3] gbias_rps # Gyro bias xyz (radians)
 float32[3] abias_m_s2 # Accel bias xyz (m/s^2)
+
+# "True" States (from EKF2)
+bool umn_control     # True: UMN app output used to control vehicle.
+float32[4] q_true    # Quaternion (NED)

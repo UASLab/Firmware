@@ -186,6 +186,7 @@ int umn_sensors_thread_main(int argc, char *argv[])
     int gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
     int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
     int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+    int umn_sub = orb_subscribe(ORB_ID(umn_output));
 
     /* subscribe to topics which will be published to selectively so that we can
        copy over the latest version of the message */
@@ -305,6 +306,9 @@ int umn_sensors_thread_main(int argc, char *argv[])
             orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
         }
 
+        // Copy over latest `umn_output` so as to capture `*_true` from ekf2
+        orb_copy(ORB_ID(umn_output), umn_sub, &uout);
+
         // Always copy over latest `control_state` and `vehicle_attitude` message
         // regardless of if changed or not.  This is because we will be selectively
         // updating it's parameters.
@@ -337,9 +341,6 @@ int umn_sensors_thread_main(int argc, char *argv[])
        
         /* Call algorithm and update output*/
         if (update(now, &sensors, &airspeed, &gps, &vehicle_land_detected, &uout)) {
-            /* publish U of MN Output */
-            int uout_inst;
-            orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
 
             // Optional: force `EKF2_UMN_CONTROL = 1`.  It may make sense to set
             //           this using QGC or via RC.
@@ -353,8 +354,14 @@ int umn_sensors_thread_main(int argc, char *argv[])
             /* Decide whether t publish modified `veicle_attitude` and 
                `control_state` messages */
             param_get(param_umn_control, &umn_control_b);
-            // PX4_INFO("EKF2_UMN_CONTROL:\t%d \n",
-            //      (int)umn_control_b);
+
+            // Log status of `EKF2_UMN_CONTROL` to know which module is controlling vehicle.
+            uout.umn_control = umn_control_b;
+
+            /* publish U of MN Output */
+            int uout_inst;
+            orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
+
             if (umn_control_b) {
                 /* publish control state */
                 ctrl_state.q[0] = uout.q[0];

@@ -81,6 +81,7 @@
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/umn_output.h>
 
 #include <ecl/EKF/ekf.h>
 
@@ -164,6 +165,8 @@ private:
 	orb_advert_t _estimator_status_pub;
 	orb_advert_t _estimator_innovations_pub;
 	orb_advert_t _replay_pub;
+	orb_advert_t _umn_pub;
+
 
 	/* Low pass filter for attitude rates */
 	math::LowPassFilter2p _lp_roll_rate;
@@ -300,6 +303,7 @@ Ekf2::Ekf2():
 	_estimator_status_pub(nullptr),
 	_estimator_innovations_pub(nullptr),
 	_replay_pub(nullptr),
+	_umn_pub(nullptr),
 	_lp_roll_rate(250.0f, 30.0f),
 	_lp_pitch_rate(250.0f, 30.0f),
 	_lp_yaw_rate(250.0f, 20.0f),
@@ -418,6 +422,10 @@ void Ekf2::task_main()
        copy over the latest version of the message */
     int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
     int _att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+    /* subscribe to umn output so as to copy latest message
+       and overwrite "*_true" entries. */
+    int _umn_sub = orb_subscribe(ORB_ID(umn_output));
+
 
 	px4_pollfd_struct_t fds[2] = {};
 	fds[0].fd = sensors_sub;
@@ -803,6 +811,24 @@ void Ekf2::task_main()
 				}
 			}
 
+
+			{
+				// [UMN APP] Publish "*_true" UMN messages
+				struct umn_output_s umn = {};
+				orb_copy(ORB_ID(umn_output), _umn_sub, &umn);
+
+				umn.q_true[0] = q(0);
+				umn.q_true[1] = q(1);
+				umn.q_true[2] = q(2);
+				umn.q_true[3] = q(3);
+
+				if (_umn_pub == nullptr) {
+					_umn_pub = orb_advertise(ORB_ID(umn_output), &umn);
+
+				} else {
+					orb_publish(ORB_ID(umn_output), _umn_pub, &umn);
+				}
+			}
 
 			{
 		        // generate vehicle attitude quaternion data
