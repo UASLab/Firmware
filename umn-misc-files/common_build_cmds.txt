@@ -1,0 +1,32 @@
+# Common Build Commands
+
+## HARDWARE
+
+>> make px4fmu-v2_default
+
+Firmware binary will be located here: 
+`~/src/Firmware/build_px4fmu-v2_default/src/firmware/nuttx/nuttx-px4fmu-v2-default.px4`
+
+
+## SOFTWARE
+
+Micro SD-card equivalent for a POSIX build is located at: 
+`~/src/Firmware/build_posix_sitl_default/tmp/rootfs/fs/microsd/`
+
+Sample settings can be found at:
+`~/src/Firmware/umn-misc-files/sample-microsd-files`
+
+
+### SIL: jMAVSIM Quadcopter
+
+>> make posix_sitl_default jmavsim
+
+
+### SIL: Gazebo Quadcopter
+
+>> HEADLESS=1 make posix_sitl_default gazebo
+
+
+### SIL: Gazebo Plane
+
+>> HEADLESS=1 make posix gazebo_plane
