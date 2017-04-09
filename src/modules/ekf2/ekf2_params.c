@@ -40,16 +40,17 @@
  */
 
 /**
- * Enable attitude control of UMN App
+ * Enable output of UMN App to be used by autopilot guidance/control.
  *
- * A value of 1 indicates that the ekf2 module will NOT publish 
- * quaternion values.  It expects the `umn_app` to be running and
- * publishing the quaternion estimates.  Default is 0.
+ * Default is 0, which indicates umn app will not publish anything.
+ * In non-zero cases, the ekf2 module will NOT publish the mentioned
+ * parameters.  It expects the `umn_app` to be running and
+ * publishing the relevant parameters.  
  *
  * @group EKF2
- * @boolean
- * @min 0
- * @max 1
+ * @value 0 ekf2: used exclusively
+ * @value 1 umn: attitude only
+ * @value 2 umn: attitude, position, velocity 
  */
 PARAM_DEFINE_INT32(EKF2_UMN_CONTROL, 0);
 

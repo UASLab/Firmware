@@ -192,6 +192,7 @@ int umn_sensors_thread_main(int argc, char *argv[])
        copy over the latest version of the message */
     int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
     int _att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+    int _lpos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 
     // RC Channels
     int rc_channels_sub = orb_subscribe(ORB_ID(rc_channels));
@@ -202,6 +203,7 @@ int umn_sensors_thread_main(int argc, char *argv[])
     orb_advert_t    _uout_pub = NULL;
     orb_advert_t    _ctrl_state_pub = nullptr;
     orb_advert_t    _att_pub = nullptr;
+    orb_advert_t    _lpos_pub = nullptr;
 
     // /* advertise debug value */
     // struct debug_key_value_s dbg = {};
@@ -232,12 +234,13 @@ int umn_sensors_thread_main(int argc, char *argv[])
     rc_channels_s rc_struct = {};
     control_state_s ctrl_state = {};
     vehicle_attitude_s att = {};
+    vehicle_local_position_s lpos = {};
 
     umn_output_s uout = {};
 
     // Local parameter value
     param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
-    bool umn_control_b = false;
+    uint32_t umn_control_b = 0;
     // int param_res = PX4_OK;
 
 
@@ -302,7 +305,7 @@ int umn_sensors_thread_main(int argc, char *argv[])
         }
 
         orb_check(vehicle_land_detected_sub, &vehicle_land_detected_updated);
-        if (gps_updated) {
+        if (vehicle_land_detected_updated) {
             orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
         }
 
@@ -314,6 +317,7 @@ int umn_sensors_thread_main(int argc, char *argv[])
         // updating it's parameters.
         orb_copy(ORB_ID(control_state), _ctrl_state_sub, &ctrl_state);
         orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
+        orb_copy(ORB_ID(vehicle_local_position), _lpos_sub, &lpos);
 
         hrt_abstime now = 0;
         now = hrt_absolute_time();
@@ -362,29 +366,71 @@ int umn_sensors_thread_main(int argc, char *argv[])
             int uout_inst;
             orb_publish_auto(ORB_ID(umn_output), &_uout_pub, &uout, &uout_inst, ORB_PRIO_HIGH);
 
-            if (umn_control_b) {
+            if (umn_control_b == 1) {
                 /* publish control state */
                 ctrl_state.q[0] = uout.q[0];
                 ctrl_state.q[1] = uout.q[1];
                 ctrl_state.q[2] = uout.q[2];
                 ctrl_state.q[3] = uout.q[3];
-                if (_ctrl_state_pub == nullptr) {
-                    _ctrl_state_pub = orb_advertise(ORB_ID(control_state), &ctrl_state);
-                } else {
-                    orb_publish(ORB_ID(control_state), _ctrl_state_pub, &ctrl_state);
-                }
+
 
                 /* publish vehicle attitude */
                 att.q[0] = uout.q[0];
                 att.q[1] = uout.q[1];
                 att.q[2] = uout.q[2];
                 att.q[3] = uout.q[3];
-                if (_att_pub == nullptr) {
-                    _att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
+            }
 
-                } else {
-                    orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
-                }
+            if (umn_control_b == 2) {
+                /* publish control state */
+                ctrl_state.q[0] = uout.q[0];
+                ctrl_state.q[1] = uout.q[1];
+                ctrl_state.q[2] = uout.q[2];
+                ctrl_state.q[3] = uout.q[3];
+
+                // Position in local NED frame
+                ctrl_state.x_pos = uout.pnorth_m;
+                ctrl_state.y_pos = uout.peast_m;
+                ctrl_state.z_pos = uout.pdown_m;
+
+                /* publish vehicle attitude */
+                att.q[0] = uout.q[0];
+                att.q[1] = uout.q[1];
+                att.q[2] = uout.q[2];
+                att.q[3] = uout.q[3];
+
+                /* publish vehicle local position */
+                // velocity in NED frame (m/s)
+                lpos.vx = uout.vnorth_mps;
+                lpos.vy = uout.veast_mps;
+                lpos.vz = uout.vdown_mps;
+
+                // Position in local NED frame
+                lpos.x = uout.pnorth_m;
+                lpos.y = uout.peast_m;
+                lpos.z = uout.pdown_m;
+            }
+
+            /*Publish global messages (note, latest copy taken above and possibly modified) */
+            if (_ctrl_state_pub == nullptr) {
+                _ctrl_state_pub = orb_advertise(ORB_ID(control_state), &ctrl_state);
+            } else {
+                orb_publish(ORB_ID(control_state), _ctrl_state_pub, &ctrl_state);
+            }
+
+            if (_att_pub == nullptr) {
+                _att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
+
+            } else {
+                orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
+            }
+
+
+            if (_lpos_pub == nullptr) {
+                _lpos_pub = orb_advertise(ORB_ID(vehicle_local_position), &lpos);
+
+            } else {
+                orb_publish(ORB_ID(vehicle_local_position), _lpos_pub, &lpos);
             }
 
             // /* Publish debug value */

@@ -27,10 +27,11 @@ float32 pdown_m       #
 float32[3] pned_std # Standard deviation of NED position estimate
 
 # Position of reference point (local NED frame origin) in global (GPS / WGS84) frame
+#   4/8/2017 note: these reference parameters will be populated by ekf2
 bool ned_global              # true if position (n, e, d) is valid and has valid global reference (ref_lat, ref_lon)
 float64 ref_lat_deg             # Reference point latitude, (degrees)
 float64 ref_lon_deg             # Reference point longitude, (degrees)
-float32 ref_alt_deg             # Reference altitude AMSL,  (metres)
+float32 ref_alt_m             # Reference altitude AMSL,  (metres)
 
 # Velocity
 float32 vnorth_mps           # North velocity in NED earth-fixed frame, (metres/sec)
@@ -52,3 +53,9 @@ float32[3] abias_m_s2 # Accel bias xyz (m/s^2)
 # "True" States (from EKF2)
 bool umn_control     # True: UMN app output used to control vehicle.
 float32[4] q_true    # Quaternion (NED)
+float32 pnorth_true_m      # position in meters in NED frame
+float32 peast_true_m      
+float32 pdown_true_m
+float32 vnorth_true_mps    # North velocity in NED earth-fixed frame, (metres/sec)
+float32 veast_true_mps     
+float32 vdown_true_mps 

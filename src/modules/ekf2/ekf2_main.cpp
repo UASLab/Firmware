@@ -422,6 +422,8 @@ void Ekf2::task_main()
        copy over the latest version of the message */
     int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
     int _att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+    int _lpos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+    int _gpos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
     /* subscribe to umn output so as to copy latest message
        and overwrite "*_true" entries. */
     int _umn_sub = orb_subscribe(ORB_ID(umn_output));
@@ -715,8 +717,8 @@ void Ekf2::task_main()
 
 			float gyro_rad[3];
 
-            /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
-	        bool umn_control_b;
+            /* [UMN-APP]: Decide which parameters to skip publishing based on value of `EKF2_UMN_CONTROL`*/
+	        uint32_t umn_control_b;
 	        param_get(param_umn_control, &umn_control_b);
 
 			{
@@ -741,27 +743,42 @@ void Ekf2::task_main()
 				Vector3f v_n(velocity);
 				matrix::Dcm<float> R_to_body(q.inversed());
 				Vector3f v_b = R_to_body * v_n;
-				ctrl_state.x_vel = v_b(0);
-				ctrl_state.y_vel = v_b(1);
-				ctrl_state.z_vel = v_b(2);
+                if (umn_control_b == 2){
+                    // Expecting UMN APP to publish
+                    //  4/8/2017 note: noticed this is not used in control.  Hence UMN appt
+                    //                 is not publishing this either.
+                } else {
+                    ctrl_state.x_vel = v_b(0);
+                    ctrl_state.y_vel = v_b(1);
+                    ctrl_state.z_vel = v_b(2);
+                }
+
 
 
 				// Local Position NED
 				float position[3];
 				_ekf.get_position(position);
-				ctrl_state.x_pos = position[0];
-				ctrl_state.y_pos = position[1];
-				ctrl_state.z_pos = position[2];
+                if (umn_control_b == 2){
+                    // Expecting UMN APP to publish
+                } else {
+                    ctrl_state.x_pos = position[0];
+                    ctrl_state.y_pos = position[1];
+                    ctrl_state.z_pos = position[2];
+                }
+				
 
 				// Attitude quaternion
 	            /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
 				/* attitude quaternions for control state */
-    	        if (!umn_control_b){
-					ctrl_state.q[0] = q(0);
-					ctrl_state.q[1] = q(1);
-					ctrl_state.q[2] = q(2);
-					ctrl_state.q[3] = q(3);
-	            }
+    	        
+                if ((umn_control_b == 1) || (umn_control_b == 2)){
+                    // Expecting UMN APP to publish
+                } else {
+                    ctrl_state.q[0] = q(0);
+                    ctrl_state.q[1] = q(1);
+                    ctrl_state.q[2] = q(2);
+                    ctrl_state.q[3] = q(3);
+                }
 
 				_ekf.get_quat_reset(&ctrl_state.delta_q_reset[0], &ctrl_state.quat_reset_counter);
 
@@ -811,26 +828,7 @@ void Ekf2::task_main()
 				}
 			}
 
-
-			{
-				// [UMN APP] Publish "*_true" UMN messages
-				struct umn_output_s umn = {};
-				orb_copy(ORB_ID(umn_output), _umn_sub, &umn);
-
-				umn.q_true[0] = q(0);
-				umn.q_true[1] = q(1);
-				umn.q_true[2] = q(2);
-				umn.q_true[3] = q(3);
-
-				if (_umn_pub == nullptr) {
-					_umn_pub = orb_advertise(ORB_ID(umn_output), &umn);
-
-				} else {
-					orb_publish(ORB_ID(umn_output), _umn_pub, &umn);
-				}
-			}
-
-			{
+			
 		        // generate vehicle attitude quaternion data
 		        struct vehicle_attitude_s att = {};
 
@@ -842,8 +840,10 @@ void Ekf2::task_main()
 				
 				att.timestamp = hrt_absolute_time();
 
-		        /* [UMN-APP]: Only publish quaternions if `EKF2_UMN_CONTROL` set to 0 */
-		        if (!umn_control_b){
+		        /* [UMN-APP] */
+		        if ((umn_control_b == 1) || (umn_control_b == 2)){
+                    // Expect UMN APP to publish
+                } else {
 					att.q[0] = q(0);
 					att.q[1] = q(1);
 					att.q[2] = q(2);
@@ -861,24 +861,37 @@ void Ekf2::task_main()
 				} else {
 					orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
 				}
-			}
+			
 
 			// generate vehicle local position data
 			struct vehicle_local_position_s lpos = {};
+            /* [UMN APP] Copy over latest message so
+            as to avoid overwriting non-set values.This is because we may
+            be selectively updating values. */
+            orb_copy(ORB_ID(vehicle_local_position), _lpos_sub, &lpos);
+
 			float pos[3] = {};
 
 			lpos.timestamp = hrt_absolute_time();
 
 			// Position of body origin in local NED frame
 			_ekf.get_position(pos);
-			lpos.x = (_ekf.local_position_is_valid()) ? pos[0] : 0.0f;
-			lpos.y = (_ekf.local_position_is_valid()) ? pos[1] : 0.0f;
-			lpos.z = pos[2];
 
-			// Velocity of body origin in local NED frame (m/s)
-			lpos.vx = velocity[0];
-			lpos.vy = velocity[1];
-			lpos.vz = velocity[2];
+
+            /* [UMN-APP] */
+            if (umn_control_b == 2){
+                // Expecting UMN APP to publish
+            } else {
+                lpos.x = (_ekf.local_position_is_valid()) ? pos[0] : 0.0f;
+                lpos.y = (_ekf.local_position_is_valid()) ? pos[1] : 0.0f;
+                lpos.z = pos[2];
+
+                // Velocity of body origin in local NED frame (m/s)
+                lpos.vx = velocity[0];
+                lpos.vy = velocity[1];
+                lpos.vz = velocity[2];
+            }
+
 
 			// TODO: better status reporting
 			lpos.xy_valid = _ekf.local_position_is_valid();
@@ -895,9 +908,16 @@ void Ekf2::task_main()
 			lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
 			lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
 
-			// The rotation of the tangent plane vs. geographical north
-			matrix::Eulerf euler(q);
-			lpos.yaw = euler.psi();
+			// The rotation of the tangmatrix::Quaternion<float> q;ent plane vs. geographical north
+            matrix::Quaternion<float> q_temp;
+            q_temp(0) = att.q[0];
+            q_temp(1) = att.q[1];
+            q_temp(2) = att.q[2];
+            q_temp(3) = att.q[3];
+			matrix::Eulerf euler(q_temp);
+
+            lpos.yaw = euler.psi();
+
 
 			float terrain_vpos;
 			lpos.dist_bottom_valid = _ekf.get_terrain_vert_pos(&terrain_vpos);
@@ -926,9 +946,46 @@ void Ekf2::task_main()
 				orb_publish(ORB_ID(vehicle_local_position), _lpos_pub, &lpos);
 			}
 
+            {
+                // [UMN APP] Publish "*_true" UMN messages
+                struct umn_output_s umn = {};
+                orb_copy(ORB_ID(umn_output), _umn_sub, &umn);
+
+                umn.q_true[0] = q(0);
+                umn.q_true[1] = q(1);
+                umn.q_true[2] = q(2);
+                umn.q_true[3] = q(3);
+
+                umn.pnorth_true_m = pos[0];
+                umn.peast_true_m = pos[1];
+                umn.pdown_true_m = pos[2];
+
+                umn.vnorth_true_mps = velocity[0];
+                umn.veast_true_mps = velocity[1];
+                umn.vdown_true_mps = velocity[2];
+
+                umn.ned_global = lpos.xy_global;
+                umn.ref_lat_deg = lpos.ref_lat;
+                umn.ref_lon_deg = lpos.ref_lon;
+                umn.ref_alt_m = lpos.ref_alt;
+
+                if (_umn_pub == nullptr) {
+                    _umn_pub = orb_advertise(ORB_ID(umn_output), &umn);
+
+                } else {
+                    orb_publish(ORB_ID(umn_output), _umn_pub, &umn);
+                }
+            }
+
 			if (_ekf.global_position_is_valid()) {
 				// generate and publish global position data
 				struct vehicle_global_position_s global_pos = {};
+
+                /* [UMN APP] Copy over latest message so
+                as to avoid overwriting non-set values.This is because we may
+                be selectively updating values. */
+                orb_copy(ORB_ID(vehicle_global_position), _gpos_sub, &global_pos);
+
 
 				global_pos.timestamp = hrt_absolute_time(); // Time of this estimate, in microseconds since system start
 				global_pos.time_utc_usec = gps.time_utc_usec; // GPS UTC timestamp in microseconds
@@ -943,16 +1000,16 @@ void Ekf2::task_main()
 				global_pos.delta_lat_lon[1] = est_lon - lon_pre_reset;
 				global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
 
-				global_pos.alt = -pos[2] + lpos.ref_alt; // Altitude AMSL in meters
+				global_pos.alt = -lpos.z + lpos.ref_alt; // Altitude AMSL in meters
 				_ekf.get_posD_reset(&global_pos.delta_alt, &global_pos.alt_reset_counter);
 				// global altitude has opposite sign of local down position
 				global_pos.delta_alt *= -1.0f;
 
-				global_pos.vel_n = velocity[0]; // Ground north velocity, m/s
-				global_pos.vel_e = velocity[1]; // Ground east velocity, m/s
-				global_pos.vel_d = velocity[2]; // Ground downside velocity, m/s
+				global_pos.vel_n = lpos.vx; // Ground north velocity, m/s
+				global_pos.vel_e = lpos.vy; // Ground east velocity, m/s
+				global_pos.vel_d = lpos.vz; // Ground downside velocity, m/s
 
-				global_pos.yaw = euler(2); // Yaw in radians -PI..+PI.
+				global_pos.yaw = lpos.yaw; // Yaw in radians -PI..+PI.
 
 				global_pos.eph = sqrt(pos_var(0) + pos_var(1));; // Standard deviation of position estimate horizontally
 				global_pos.epv = sqrt(pos_var(2)); // Standard deviation of position vertically
