@@ -47,7 +47,7 @@
  * parameters.  It expects the `umn_app` to be running and
  * publishing the relevant parameters.  
  *
- * @group EKF2
+ * @group UMN
  * @value 0 ekf2: used exclusively
  * @value 1 umn: attitude only
  * @value 2 umn: attitude, position, velocity 
