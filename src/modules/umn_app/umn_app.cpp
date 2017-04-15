@@ -240,7 +240,9 @@ int umn_sensors_thread_main(int argc, char *argv[])
 
     // Local parameter value
     param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
+    param_t param_umn_gps_available = param_find("UMN_GPS_ON");
     uint32_t umn_control_b = 0;
+    uint32_t umn_gps_available_b = 1;
     // int param_res = PX4_OK;
 
 
@@ -292,11 +294,18 @@ int umn_sensors_thread_main(int argc, char *argv[])
         bool vehicle_land_detected_updated = false;
 
         orb_copy(ORB_ID(sensor_combined), sensor_sub, &sensors);
-        
+       
         /* update all other topics if they have new data */
-        orb_check(gps_sub, &gps_updated);
-        if (gps_updated) {
-            orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps);
+
+        /* Decide whether GPS should be updated */
+        param_get(param_umn_gps_available, &umn_gps_available_b);
+        if (umn_gps_available_b){
+            orb_check(gps_sub, &gps_updated);
+            if (gps_updated) {
+                orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps);
+            }
+        } else {
+            gps.satellites_used = 0;
         }
 
         orb_check(airspeed_sub, &airspeed_updated);
@@ -358,9 +367,11 @@ int umn_sensors_thread_main(int argc, char *argv[])
             /* Decide whether t publish modified `veicle_attitude` and 
                `control_state` messages */
             param_get(param_umn_control, &umn_control_b);
+            param_get(param_umn_gps_available, &umn_gps_available_b);
 
             // Log status of `EKF2_UMN_CONTROL` to know which module is controlling vehicle.
             uout.umn_control = umn_control_b;
+            uout.umn_gps_on = umn_gps_available_b;
 
             /* publish U of MN Output */
             int uout_inst;

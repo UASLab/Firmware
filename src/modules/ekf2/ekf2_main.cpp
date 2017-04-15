@@ -418,6 +418,7 @@ void Ekf2::task_main()
 
     /* [UMN APP] Place holder to store parameters */
     param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
+    param_t param_umn_gps_available = param_find("UMN_GPS_ON");
     /* subscribe to topics which will be published to selectively so that we can
        copy over the latest version of the message */
     int _ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
@@ -719,8 +720,9 @@ void Ekf2::task_main()
 
             /* [UMN-APP]: Decide which parameters to skip publishing based on value of `EKF2_UMN_CONTROL`*/
 	        uint32_t umn_control_b;
+            uint32_t umn_gps_available_b;
 	        param_get(param_umn_control, &umn_control_b);
-
+            param_get(param_umn_gps_available, &umn_gps_available_b);
 			{
 				// generate control state data
 				control_state_s ctrl_state = {};
@@ -968,6 +970,15 @@ void Ekf2::task_main()
                 umn.ref_lat_deg = lpos.ref_lat;
                 umn.ref_lon_deg = lpos.ref_lon;
                 umn.ref_alt_m = lpos.ref_alt;
+
+                if (umn_gps_available_b){
+					float gyro_bias[3] = {};
+					_ekf.get_gyro_bias(gyro_bias);
+
+					umn.gbias_ekf2_rps[0] = gyro_bias[0];
+					umn.gbias_ekf2_rps[1] = gyro_bias[1];
+					umn.gbias_ekf2_rps[2] = gyro_bias[2];
+                }
 
                 if (_umn_pub == nullptr) {
                     _umn_pub = orb_advertise(ORB_ID(umn_output), &umn);
