@@ -51,8 +51,8 @@ float32[3] gbias_rps # Gyro bias xyz (radians)
 float32[3] abias_m_s2 # Accel bias xyz (m/s^2)
 
 # "True" States (from EKF2)
-bool umn_control    # True: UMN app output used to control vehicle.
-bool umn_gps_on     # True: status of GPS for UMN app.
+int32 umn_control    # True: UMN app output used to control vehicle.
+int32 umn_gps_on     # True: status of GPS for UMN app.
 float32[4] q_true    # Quaternion (NED)
 float32 pnorth_true_m      # position in meters in NED frame
 float32 peast_true_m      

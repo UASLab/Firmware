@@ -241,8 +241,8 @@ int umn_sensors_thread_main(int argc, char *argv[])
     // Local parameter value
     param_t param_umn_control = param_find("EKF2_UMN_CONTROL");
     param_t param_umn_gps_available = param_find("UMN_GPS_ON");
-    uint32_t umn_control_b = 0;
-    uint32_t umn_gps_available_b = 1;
+    int32_t umn_control_b = 0;
+    int32_t umn_gps_available_b = 1;
     // int param_res = PX4_OK;
 
 
@@ -352,6 +352,13 @@ int umn_sensors_thread_main(int argc, char *argv[])
         /* generate control state data */
         // note: of all the messages, we will only update the quaternions
        
+        param_get(param_umn_control, &umn_control_b);
+        param_get(param_umn_gps_available, &umn_gps_available_b);
+
+        // Log status of `EKF2_UMN_CONTROL` & `UMN_GPS_ON` to know which module is controlling vehicle.
+        uout.umn_control = umn_control_b;
+        uout.umn_gps_on = umn_gps_available_b;
+
         /* Call algorithm and update output*/
         if (update(now, &sensors, &airspeed, &gps, &vehicle_land_detected, &uout)) {
 
@@ -366,12 +373,6 @@ int umn_sensors_thread_main(int argc, char *argv[])
 
             /* Decide whether t publish modified `veicle_attitude` and 
                `control_state` messages */
-            param_get(param_umn_control, &umn_control_b);
-            param_get(param_umn_gps_available, &umn_gps_available_b);
-
-            // Log status of `EKF2_UMN_CONTROL` to know which module is controlling vehicle.
-            uout.umn_control = umn_control_b;
-            uout.umn_gps_on = umn_gps_available_b;
 
             /* publish U of MN Output */
             int uout_inst;
