@@ -37,7 +37,7 @@ float32 ref_alt_m             # Reference altitude AMSL,  (metres)
 float32 vnorth_mps           # North velocity in NED earth-fixed frame, (metres/sec)
 float32 veast_mps           # East velocity in NED earth-fixed frame, (metres/sec)
 float32 vdown_mps           # Down velocity in NED earth-fixed frame, (metres/sec)
-float32[3] vned_std # Standard-deviation of velocity estimate
+float32[3] vned_std 	# Standard-deviation of velocity estimate
 
 # Wind
 float32 windspeed_north_mps     # Wind component in north direction (meters/sec)
@@ -61,4 +61,4 @@ float32 vnorth_true_mps    # North velocity in NED earth-fixed frame, (metres/se
 float32 veast_true_mps     
 float32 vdown_true_mps 
 
-float32[3] gbias_ekf2_rps # EKF2 Gyro bias xyz, updated if GPS available (radians)
+float32[3] gbias_ekf2_rps # EKF2 Gyro bias xyz, updated if GPS available (radians/sec)

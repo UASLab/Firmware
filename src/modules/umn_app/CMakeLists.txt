@@ -37,7 +37,8 @@ px4_add_module(
 	STACK_MAX 4000
 	SRCS
 		umn_app.cpp
-        umn_algorithm.cpp
+        	umn_algorithm.cpp
+		nav_functions.cpp
 	DEPENDS
 		platforms__common
 	)
